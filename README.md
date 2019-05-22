@@ -1,5 +1,9 @@
 # Horisontal Pods Autoscaling for .NET applications
 
+## Benefits of Autoscaling
+
+To understand better where autoscaling would provide the most value, let’s start with an example. Imagine you have a 24/7 production service with a load that is variable in time, where it is very busy during the day in the US, and relatively low at night. Ideally, we would want the number of nodes in the cluster and the number of pods in deployment to dynamically adjust to the load to meet end user demand. The new Cluster Autoscaling feature together with Horizontal Pod Autoscaler can handle this for you automatically.
+
 ## How does the Horizontal Pod Autoscaler work?
 
 ![HPA](https://d33wubrfki0l68.cloudfront.net/4fe1ef7265a93f5f564bd3fbb0269ebd10b73b4e/1775d/images/docs/horizontal-pod-autoscaler.svg)
@@ -20,7 +24,7 @@ In addition, there is a special `kubectl autoscale` command for easy creation of
 
 The full list of possible autoscale commands can be found here: [https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#autoscale](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#autoscale)
 
-## Support for custom metrics
+## Horizontal Pod Autoscale with custom metrics
 
 By default, the HorizontalPodAutoscaler controller retrieves metrics from a series of APIs. In order for it to access these APIs, cluster administrators must ensure that:
 
@@ -30,10 +34,16 @@ By default, the HorizontalPodAutoscaler controller retrieves metrics from a seri
 
     * For resource metrics, this is the `metrics.k8s.io` API, generally provided by metrics-server. It can be launched as a cluster addon.
 
-    * For custom metrics, this is the `custom.metrics.k8s.io` API. It’s provided by “adapter” API servers provided by metrics solution vendors. Check with your metrics pipeline, or the list of known solutions. If you would like to write your own, check out the boilerplate to get started.
+    * For custom metrics, this is the `custom.metrics.k8s.io` API. **It’s provided by “adapter” API servers provided by metrics solution vendors.** Check with your metrics pipeline, or the list of known solutions. If you would like to write your own, check out the boilerplate to get started.
 
     * For external metrics, this is the `external.metrics.k8s.io` API. It may be provided by the custom metrics adapters provided above.
 
     * The `--horizontal-pod-autoscaler-use-rest-clients` is `true` or `unset`. Setting this to false switches to Heapster-based autoscaling, which is deprecated.
   
 More information is here: [https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-metrics-apis](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-metrics-apis)
+
+## Custom metrics architecture high level
+
+This architecture includes the **prometheus custom metrics adapter**, which is used to extend the `custom.metrics.k8s.io` API with your own metrics.
+
+![CM](https://github.com/luxas/kubeadm-workshop/blob/master/pictures/custom-metrics-architecture.png)
