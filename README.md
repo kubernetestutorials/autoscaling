@@ -47,3 +47,6 @@ More information is here: [https://kubernetes.io/docs/tasks/run-application/hori
 This architecture includes the **prometheus custom metrics adapter**, which is used to extend the `custom.metrics.k8s.io` API with your own metrics.
 
 ![CM](https://github.com/luxas/kubeadm-workshop/blob/master/pictures/custom-metrics-architecture.png)
+
+## License
+Tutorials is licensed under the [MIT license](https://github.com/dotnet/docfx/blob/dev/LICENSE).
