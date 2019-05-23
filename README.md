@@ -142,7 +142,66 @@ ingress "sample-metrics-app" created
 
 Then you can go and check out the Custom Metrics API, it should notice that a lot of requests have been served recently.
 
+```console
+$ (Invoke-WebRequest http://localhost:8001/apis/custom.metrics.k8s.io/v1beta1/namespaces/default
+/services/sample-metrics-app/my_app_num_requests).Content
+{
+  "kind": "MetricValueList",
+  "apiVersion": "custom.metrics.k8s.io/v1beta1",
+  "metadata": {
+    "selfLink": "/apis/custom.metrics.k8s.io/v1beta1/namespaces/default/services/sample-metrics-app/my_app_num_requests"
+  },
+  "items": [
+    {
+      "describedObject": {
+        "kind": "Service",
+        "name": "sample-metrics-app",
+        "apiVersion": "/__internal"
+      },
+      "metricName": "my_app_num_requests",
+      "timestamp": "2019-05-23T10:32:50Z",
+      "value": "0"
+    }
+  ]
+}
+```
+Let's get the information about hpa. The column **Target** displays information about current metrics value and the number of my_app_num_requests required to start scaling process.
 
+```console
+$ kubectl get hpa
+NAME                     REFERENCE                       TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+sample-metrics-app-hpa   Deployment/sample-metrics-app   0/10      2         5         2          2d22h
+```
+
+Now we can add several requests to increase the number of replicas
+
+```console
+$ kubectl exec -it sample-metrics-app-59dbbd5bb9-ktn4g curl http://sample-metrics-app/set/15
+5.0
+```
+
+Check the autoscaling status after about 1-2 minutes because of refreshing interval
+
+```console
+$ kubectl get hpa
+NAME                     REFERENCE                       TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+sample-metrics-app-hpa   Deployment/sample-metrics-app   15/10      2         5         5          2d23h
+```
+
+Now run the **DOWNSCALE** 
+
+```console
+$ kubectl exec -it sample-metrics-app-59dbbd5bb9-ktn4g curl http://sample-metrics-app/set/-15
+5.0
+```
+
+Check the autoscaling status after about 1-2 minutes because of refreshing interval
+
+```console
+$ kubectl get hpa
+NAME                     REFERENCE                       TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+sample-metrics-app-hpa   Deployment/sample-metrics-app   0/10      2         2         5          2d23h
+```
 
 ## License
 Tutorials is licensed under the [MIT license](https://github.com/dotnet/docfx/blob/dev/LICENSE).
