@@ -50,8 +50,158 @@ This architecture includes the **prometheus custom metrics adapter**, which is u
 
 ## Create .NET CORE Web API application with custom metrics
 
+### Install prometheus-net NuGet packages
 
+**Prometheus-net** allows you to instrument your code with custom metrics and provides some built-in metric collection integrations for ASP.NET Core.
 
+The documentation here is only a minimal quick start. For detailed guidance on using Prometheus in your solutions, refer to the [prometheus-users discussion group](https://groups.google.com/forum/#!forum/prometheus-users). You are also expected to be familiar with the [Prometheus user guide](https://prometheus.io/docs/introduction/overview/).
+
+Four types of metrics are available: Counter, Gauge, Summary and Histogram. See the documentation on [metric types](http://prometheus.io/docs/concepts/metric_types/) and [instrumentation best practices](http://prometheus.io/docs/practices/instrumentation/#counter-vs.-gauge-vs.-summary) to learn what each is good for.
+
+**The `Metrics` class is the main entry point to the API of this library.** The most common practice in C# code is to have a `static readonly` field for each metric that you wish to export from a given class.
+
+More complex patterns may also be used (e.g. combining with dependency injection). The library is quite tolerant of different usage models - if the API allows it, it will generally work fine and provide satisfactory performance. The library is thread-safe.
+
+#### Installation
+
+Nuget package for general use and metrics export via HttpListener or to Pushgateway: [prometheus-net](https://www.nuget.org/packages/prometheus-net)
+
+>Install-Package prometheus-net
+
+Nuget package for ASP.NET Core middleware and stand-alone Kestrel metrics server: [prometheus-net.AspNetCore](https://www.nuget.org/packages/prometheus-net.AspNetCore)
+
+>Install-Package prometheus-net.AspNetCore
+
+#### Usage
+
+In `Startup.cs` add `app.UseMetricServer()` to enable custom metrics gathering.
+
+```
+        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
+            app.UseMetricServer();
+            app.UseMvc();
+        }
+```
+Then declare your custom metric as a static property. I've created `my_app_num_requests` metric to control the number of calls of exact Action in Controller.
+
+```    public static class Counters
+    {
+        public static readonly Gauge RequestsCounter = Metrics.CreateGauge("my_app_num_requests", 
+            "Number of requests.");
+    }
+```
+
+More information about Usage of custom metrics can be found here: [https://github.com/prometheus-net/prometheus-net/](https://github.com/prometheus-net/prometheus-net/)
+
+### Deploying a custom metrics API Server and a CusomMetricsSample
+
+In v1.6, the Horizontal Pod Autoscaler controller can now consume custom metrics for autoscaling. For this to work, one needs to have enabled the `autoscaling/v2alpha1` API group which makes it possible to create Horizontal Pod Autoscaler resources of the new version.
+
+Also, one must have API aggregation enabled (which is the case in this demo) and a extension API Server that provides the `custom-metrics.metrics.k8s.io/v1alpha1` API group/version.
+
+I've built an example custom metrics server that queries a Prometheus instance for metrics data and exposing them in the custom metrics Kubernetes API. You can think of this custom metrics server as a shim/conversation layer between Prometheus data and the Horizontal Pod Autoscaling API for Kubernetes.
+
+```console
+$ kubectl apply -f monitoring/custom-metrics.yaml
+namespace "custom-metrics" created
+serviceaccount "custom-metrics-apiserver" created
+clusterrolebinding "custom-metrics:system:auth-delegator" created
+rolebinding "custom-metrics-auth-reader" created
+clusterrole "custom-metrics-read" created
+clusterrolebinding "custom-metrics-read" created
+deployment "custom-metrics-apiserver" created
+service "api" created
+apiservice "v1alpha1.custom-metrics.metrics.k8s.io" created
+clusterrole "custom-metrics-server-resources" created
+clusterrolebinding "hpa-controller-custom-metrics" created
+```
+
+If you want to be able to `curl` the custom metrics API server easily (i.e. allow anyone to access the Custom Metrics API), you can
+run this `kubectl` command:
+
+```console
+$ kubectl create clusterrolebinding allowall-cm --clusterrole custom-metrics-server-resources --user system:anonymous
+clusterrolebinding "allowall-cm" created
+```
+
+```console
+$ kubectl apply -f monitoring/sample-metrics-app.yaml
+deployment "sample-metrics-app" created
+service "sample-metrics-app" created
+servicemonitor "sample-metrics-app" created
+horizontalpodautoscaler "sample-metrics-app-hpa" created
+ingress "sample-metrics-app" created
+```
+
+Then you can go and check out the Custom Metrics API, it should notice that a lot of requests have been served recently.
+
+```console
+$ (Invoke-WebRequest http://localhost:8001/apis/custom.metrics.k8s.io/v1beta1/namespaces/default
+/services/sample-metrics-app/my_app_num_requests).Content
+{
+  "kind": "MetricValueList",
+  "apiVersion": "custom.metrics.k8s.io/v1beta1",
+  "metadata": {
+    "selfLink": "/apis/custom.metrics.k8s.io/v1beta1/namespaces/default/services/sample-metrics-app/my_app_num_requests"
+  },
+  "items": [
+    {
+      "describedObject": {
+        "kind": "Service",
+        "name": "sample-metrics-app",
+        "apiVersion": "/__internal"
+      },
+      "metricName": "my_app_num_requests",
+      "timestamp": "2019-05-23T10:32:50Z",
+      "value": "0"
+    }
+  ]
+}
+```
+Let's get the information about hpa. The column **Target** displays information about current metrics value and the number of my_app_num_requests required to start scaling process.
+
+```console
+$ kubectl get hpa
+NAME                     REFERENCE                       TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+sample-metrics-app-hpa   Deployment/sample-metrics-app   0/10      2         5         2          2d22h
+```
+
+Now we can add several requests to increase the number of replicas
+
+```console
+$ kubectl exec -it sample-metrics-app-59dbbd5bb9-ktn4g curl http://sample-metrics-app/set/15
+5.0
+```
+
+Check the autoscaling status after about 1-2 minutes because of refreshing interval
+
+```console
+$ kubectl get hpa
+NAME                     REFERENCE                       TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+sample-metrics-app-hpa   Deployment/sample-metrics-app   15/10      2         5         5          2d23h
+```
+
+Now run the **DOWNSCALE** 
+
+```console
+$ kubectl exec -it sample-metrics-app-59dbbd5bb9-ktn4g curl http://sample-metrics-app/set/-15
+5.0
+```
+
+Check the autoscaling status after about 1-2 minutes because of refreshing interval
+
+```console
+$ kubectl get hpa
+NAME                     REFERENCE                       TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+sample-metrics-app-hpa   Deployment/sample-metrics-app   0/10      2         2         5          2d23h
+```
 
 ## License
 Tutorials is licensed under the [MIT license](https://github.com/dotnet/docfx/blob/dev/LICENSE).
