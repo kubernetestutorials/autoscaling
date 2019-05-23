@@ -48,5 +48,10 @@ This architecture includes the **prometheus custom metrics adapter**, which is u
 
 ![CM](https://github.com/luxas/kubeadm-workshop/blob/master/pictures/custom-metrics-architecture.png)
 
+## Create .NET CORE Web API application with custom metrics
+
+
+
+
 ## License
 Tutorials is licensed under the [MIT license](https://github.com/dotnet/docfx/blob/dev/LICENSE).
