@@ -200,7 +200,7 @@ Check the autoscaling status after about 1-2 minutes because of refreshing inter
 ```console
 $ kubectl get hpa
 NAME                     REFERENCE                       TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
-sample-metrics-app-hpa   Deployment/sample-metrics-app   0/10      2         2         5          2d23h
+sample-metrics-app-hpa   Deployment/sample-metrics-app   0/10      2         5         2          2d23h
 ```
 
 ## License
