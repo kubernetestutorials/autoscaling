@@ -62,7 +62,7 @@ Four types of metrics are available: Counter, Gauge, Summary and Histogram. See 
 
 More complex patterns may also be used (e.g. combining with dependency injection). The library is quite tolerant of different usage models - if the API allows it, it will generally work fine and provide satisfactory performance. The library is thread-safe.
 
-## Installation
+#### Installation
 
 Nuget package for general use and metrics export via HttpListener or to Pushgateway: [prometheus-net](https://www.nuget.org/packages/prometheus-net)
 
@@ -72,7 +72,7 @@ Nuget package for ASP.NET Core middleware and stand-alone Kestrel metrics server
 
 >Install-Package prometheus-net.AspNetCore
 
-## Usage
+#### Usage
 
 In `Startup.cs` add `app.UseMetricServer()` to enable custom metrics gathering.
 
@@ -99,6 +99,49 @@ Then declare your custom metric as a static property. I've created `my_app_num_r
 ```
 
 More information about Usage of custom metrics can be found here: [https://github.com/prometheus-net/prometheus-net/](https://github.com/prometheus-net/prometheus-net/)
+
+### Deploying a custom metrics API Server and a CusomMetricsSample
+
+In v1.6, the Horizontal Pod Autoscaler controller can now consume custom metrics for autoscaling. For this to work, one needs to have enabled the `autoscaling/v2alpha1` API group which makes it possible to create Horizontal Pod Autoscaler resources of the new version.
+
+Also, one must have API aggregation enabled (which is the case in this demo) and a extension API Server that provides the `custom-metrics.metrics.k8s.io/v1alpha1` API group/version.
+
+I've built an example custom metrics server that queries a Prometheus instance for metrics data and exposing them in the custom metrics Kubernetes API. You can think of this custom metrics server as a shim/conversation layer between Prometheus data and the Horizontal Pod Autoscaling API for Kubernetes.
+
+```console
+$ kubectl apply -f monitoring/custom-metrics.yaml
+namespace "custom-metrics" created
+serviceaccount "custom-metrics-apiserver" created
+clusterrolebinding "custom-metrics:system:auth-delegator" created
+rolebinding "custom-metrics-auth-reader" created
+clusterrole "custom-metrics-read" created
+clusterrolebinding "custom-metrics-read" created
+deployment "custom-metrics-apiserver" created
+service "api" created
+apiservice "v1alpha1.custom-metrics.metrics.k8s.io" created
+clusterrole "custom-metrics-server-resources" created
+clusterrolebinding "hpa-controller-custom-metrics" created
+```
+
+If you want to be able to `curl` the custom metrics API server easily (i.e. allow anyone to access the Custom Metrics API), you can
+run this `kubectl` command:
+
+```console
+$ kubectl create clusterrolebinding allowall-cm --clusterrole custom-metrics-server-resources --user system:anonymous
+clusterrolebinding "allowall-cm" created
+```
+
+```console
+$ kubectl apply -f monitoring/sample-metrics-app.yaml
+deployment "sample-metrics-app" created
+service "sample-metrics-app" created
+servicemonitor "sample-metrics-app" created
+horizontalpodautoscaler "sample-metrics-app-hpa" created
+ingress "sample-metrics-app" created
+```
+
+Then you can go and check out the Custom Metrics API, it should notice that a lot of requests have been served recently.
+
 
 
 ## License
