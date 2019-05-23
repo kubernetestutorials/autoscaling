@@ -50,7 +50,55 @@ This architecture includes the **prometheus custom metrics adapter**, which is u
 
 ## Create .NET CORE Web API application with custom metrics
 
+### Install prometheus-net NuGet packages
 
+**Prometheus-net** allows you to instrument your code with custom metrics and provides some built-in metric collection integrations for ASP.NET Core.
+
+The documentation here is only a minimal quick start. For detailed guidance on using Prometheus in your solutions, refer to the [prometheus-users discussion group](https://groups.google.com/forum/#!forum/prometheus-users). You are also expected to be familiar with the [Prometheus user guide](https://prometheus.io/docs/introduction/overview/).
+
+Four types of metrics are available: Counter, Gauge, Summary and Histogram. See the documentation on [metric types](http://prometheus.io/docs/concepts/metric_types/) and [instrumentation best practices](http://prometheus.io/docs/practices/instrumentation/#counter-vs.-gauge-vs.-summary) to learn what each is good for.
+
+**The `Metrics` class is the main entry point to the API of this library.** The most common practice in C# code is to have a `static readonly` field for each metric that you wish to export from a given class.
+
+More complex patterns may also be used (e.g. combining with dependency injection). The library is quite tolerant of different usage models - if the API allows it, it will generally work fine and provide satisfactory performance. The library is thread-safe.
+
+## Installation
+
+Nuget package for general use and metrics export via HttpListener or to Pushgateway: [prometheus-net](https://www.nuget.org/packages/prometheus-net)
+
+>Install-Package prometheus-net
+
+Nuget package for ASP.NET Core middleware and stand-alone Kestrel metrics server: [prometheus-net.AspNetCore](https://www.nuget.org/packages/prometheus-net.AspNetCore)
+
+>Install-Package prometheus-net.AspNetCore
+
+## Usage
+
+In `Startup.cs` add `app.UseMetricServer()` to enable custom metrics gathering.
+
+```
+        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
+            app.UseMetricServer();
+            app.UseMvc();
+        }
+```
+Then declare your custom metric as a static property. I've created `my_app_num_requests` metric to control the number of calls of exact Action in Controller.
+
+```    public static class Counters
+    {
+        public static readonly Gauge RequestsCounter = Metrics.CreateGauge("my_app_num_requests", 
+            "Number of requests.");
+    }
+```
+
+More information about Usage of custom metrics can be found here: [https://github.com/prometheus-net/prometheus-net/](https://github.com/prometheus-net/prometheus-net/)
 
 
 ## License
